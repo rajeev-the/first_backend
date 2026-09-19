@@ -30,6 +30,9 @@ let AllExceptionsFilter = AllExceptionsFilter_1 = class AllExceptionsFilter {
                 message = resObj.message ?? exception.message;
                 error = resObj.error ?? exception.name;
             }
+            if (statusCode === common_1.HttpStatus.BAD_REQUEST) {
+                this.logger.warn(`[400 Bad Request] ${request.method} ${request.url} - Error: ${JSON.stringify(message)} - Body: ${JSON.stringify(request.body)}`);
+            }
         }
         else if (exception instanceof Error) {
             message = exception.message;

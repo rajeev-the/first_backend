@@ -38,6 +38,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = resObj.message ?? exception.message;
         error = resObj.error ?? exception.name;
       }
+
+      if (statusCode === HttpStatus.BAD_REQUEST) {
+        this.logger.warn(
+          `[400 Bad Request] ${request.method} ${request.url} - Error: ${JSON.stringify(message)} - Body: ${JSON.stringify(request.body)}`,
+        );
+      }
     } else if (exception instanceof Error) {
       message = exception.message;
       error = exception.name;

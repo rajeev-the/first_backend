@@ -211,26 +211,28 @@ let ProfessionalsService = ProfessionalsService_1 = class ProfessionalsService {
             },
         });
         if (dto.categoryIds && dto.categoryIds.length > 0) {
-            for (const catId of dto.categoryIds) {
-                const catExists = await this.prisma.serviceCategory.findUnique({
-                    where: { id: catId },
+            const uniqueCategoryIds = Array.from(new Set(dto.categoryIds));
+            const existingCategories = await this.prisma.serviceCategory.findMany({
+                where: { id: { in: uniqueCategoryIds } },
+                select: { id: true },
+            });
+            const validCatIds = existingCategories.map((c) => c.id);
+            if (validCatIds.length > 0) {
+                await this.prisma.professionalService.createMany({
+                    data: validCatIds.map((categoryId) => ({
+                        professionalId: professional.id,
+                        categoryId,
+                        isActive: true,
+                    })),
+                    skipDuplicates: true,
                 });
-                if (catExists) {
-                    await this.prisma.professionalService.upsert({
-                        where: {
-                            professionalId_categoryId: {
-                                professionalId: professional.id,
-                                categoryId: catId,
-                            },
-                        },
-                        update: { isActive: true },
-                        create: {
-                            professionalId: professional.id,
-                            categoryId: catId,
-                            isActive: true,
-                        },
-                    });
-                }
+                await this.prisma.professionalService.updateMany({
+                    where: {
+                        professionalId: professional.id,
+                        categoryId: { in: validCatIds },
+                    },
+                    data: { isActive: true },
+                });
             }
         }
         this.logger.log(`[Professionals] Profile initialized/updated for user ${userId}`);
@@ -316,35 +318,77 @@ let ProfessionalsService = ProfessionalsService_1 = class ProfessionalsService {
         if (!professional) {
             throw new common_1.NotFoundException('Professional profile not found');
         }
-        for (const categoryId of dto.categoryIds) {
-            const category = await this.prisma.serviceCategory.findUnique({
-                where: { id: categoryId },
-            });
-            if (!category) {
-                throw new common_1.BadRequestException(`Category with ID ${categoryId} does not exist`);
-            }
-            await this.prisma.professionalService.upsert({
-                where: {
-                    professionalId_categoryId: {
-                        professionalId: professional.id,
-                        categoryId,
-                    },
-                },
-                update: {
-                    isActive: true,
-                    ...(dto.customRate !== undefined
-                        ? { customRate: new client_1.Prisma.Decimal(dto.customRate) }
-                        : {}),
-                },
-                create: {
+        if (!dto.categoryIds || dto.categoryIds.length === 0) {
+            return this.getMyServices(userId);
+        }
+        const uniqueCategoryIds = Array.from(new Set(dto.categoryIds));
+        const existingCategories = await this.prisma.serviceCategory.findMany({
+            where: { id: { in: uniqueCategoryIds } },
+            select: { id: true },
+        });
+        if (existingCategories.length !== uniqueCategoryIds.length) {
+            const foundIds = new Set(existingCategories.map((c) => c.id));
+            const missingIds = uniqueCategoryIds.filter((id) => !foundIds.has(id));
+            throw new common_1.BadRequestException(`Category with ID ${missingIds[0]} does not exist`);
+        }
+        const existingLinks = await this.prisma.professionalService.findMany({
+            where: {
+                professionalId: professional.id,
+                categoryId: { in: uniqueCategoryIds },
+            },
+            select: { categoryId: true },
+        });
+        const existingCatIdSet = new Set(existingLinks.map((l) => l.categoryId));
+        const toCreate = uniqueCategoryIds.filter((id) => !existingCatIdSet.has(id));
+        const toUpdate = uniqueCategoryIds.filter((id) => existingCatIdSet.has(id));
+        const customRateVal = dto.customRate !== undefined && dto.customRate !== null
+            ? new client_1.Prisma.Decimal(dto.customRate)
+            : null;
+        const operations = [];
+        if (toCreate.length > 0) {
+            operations.push(this.prisma.professionalService.createMany({
+                data: toCreate.map((categoryId) => ({
                     professionalId: professional.id,
                     categoryId,
                     isActive: true,
-                    customRate: dto.customRate ? new client_1.Prisma.Decimal(dto.customRate) : null,
-                },
-            });
+                    customRate: customRateVal,
+                })),
+                skipDuplicates: true,
+            }));
         }
-        return this.getMyServices(userId);
+        if (toUpdate.length > 0) {
+            operations.push(this.prisma.professionalService.updateMany({
+                where: {
+                    professionalId: professional.id,
+                    categoryId: { in: toUpdate },
+                },
+                data: {
+                    isActive: true,
+                    ...(dto.customRate !== undefined ? { customRate: customRateVal } : {}),
+                },
+            }));
+        }
+        if (operations.length > 0) {
+            await Promise.all(operations);
+        }
+        const services = await this.prisma.professionalService.findMany({
+            where: {
+                professionalId: professional.id,
+                isActive: true,
+            },
+            include: { category: true },
+            orderBy: { createdAt: 'asc' },
+        });
+        return services.map((s) => ({
+            id: s.id,
+            categoryId: s.categoryId,
+            categoryName: s.category.name,
+            categorySlug: s.category.slug,
+            categoryIcon: s.category.icon,
+            customRate: s.customRate ? Number(s.customRate) : null,
+            isActive: s.isActive,
+            createdAt: s.createdAt,
+        }));
     }
     async getMyServices(userId) {
         const professional = await this.prisma.professional.findUnique({

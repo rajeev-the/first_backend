@@ -38,6 +38,7 @@ __decorate([
         example: 'Near Metro Station Gate 2',
         description: 'Secondary address or area',
     }),
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' || value === null ? undefined : value)),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(200),
@@ -66,6 +67,7 @@ __decorate([
 ], BookingAddressDto.prototype, "pincode", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'Opposite City Mall', description: 'Nearby landmark' }),
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' || value === null ? undefined : value)),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(150),
@@ -90,7 +92,7 @@ __decorate([
         example: 'd9b2d63d-a233-4123-8478-94420e6f66aa',
     }),
     (0, class_validator_1.IsNotEmpty)({ message: 'professionalId is required' }),
-    (0, class_validator_1.IsUUID)('4', { message: 'professionalId must be a valid UUID' }),
+    (0, class_validator_1.IsUUID)('all', { message: 'professionalId must be a valid UUID' }),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "professionalId", void 0);
 __decorate([
@@ -99,16 +101,32 @@ __decorate([
         example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     }),
     (0, class_validator_1.IsNotEmpty)({ message: 'categoryId is required' }),
-    (0, class_validator_1.IsUUID)('4', { message: 'categoryId must be a valid UUID' }),
+    (0, class_validator_1.IsUUID)('all', { message: 'categoryId must be a valid UUID' }),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "categoryId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({
-        description: 'UUID of specific problem type (optional)',
+        description: 'UUID or code of specific problem type (optional)',
         example: '8fb2d63d-a233-4123-8478-94420e6f66aa',
     }),
+    (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === null || value === undefined)
+            return undefined;
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed ||
+                trimmed === 'null' ||
+                trimmed === 'undefined' ||
+                trimmed === 'none' ||
+                trimmed === 'other') {
+                return undefined;
+            }
+            return trimmed;
+        }
+        return value;
+    }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsUUID)('4', { message: 'problemId must be a valid UUID' }),
+    (0, class_validator_1.IsString)({ message: 'problemId must be a string' }),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "problemId", void 0);
 __decorate([
@@ -134,6 +152,7 @@ __decorate([
 ], CreateBookingDto.prototype, "address", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 28.6139, description: 'Latitude of customer visit location' }),
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' || value === null || isNaN(Number(value)) ? undefined : Number(value))),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(-90),
@@ -142,6 +161,7 @@ __decorate([
 ], CreateBookingDto.prototype, "latitude", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 77.209, description: 'Longitude of customer visit location' }),
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' || value === null || isNaN(Number(value)) ? undefined : Number(value))),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(-180),
@@ -162,6 +182,7 @@ __decorate([
         example: '10:00 AM - 12:00 PM',
         description: 'Preferred time window for professional arrival',
     }),
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' || value === null ? undefined : value)),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

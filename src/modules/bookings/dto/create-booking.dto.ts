@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
@@ -30,6 +31,7 @@ export class BookingAddressDto {
     example: 'Near Metro Station Gate 2',
     description: 'Secondary address or area',
   })
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -54,6 +56,7 @@ export class BookingAddressDto {
   pincode: string;
 
   @ApiPropertyOptional({ example: 'Opposite City Mall', description: 'Nearby landmark' })
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsOptional()
   @IsString()
   @MaxLength(150)
@@ -66,7 +69,7 @@ export class CreateBookingDto {
     example: 'd9b2d63d-a233-4123-8478-94420e6f66aa',
   })
   @IsNotEmpty({ message: 'professionalId is required' })
-  @IsUUID('4', { message: 'professionalId must be a valid UUID' })
+  @IsUUID('all', { message: 'professionalId must be a valid UUID' })
   professionalId: string;
 
   @ApiProperty({
@@ -74,15 +77,32 @@ export class CreateBookingDto {
     example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   })
   @IsNotEmpty({ message: 'categoryId is required' })
-  @IsUUID('4', { message: 'categoryId must be a valid UUID' })
+  @IsUUID('all', { message: 'categoryId must be a valid UUID' })
   categoryId: string;
 
   @ApiPropertyOptional({
-    description: 'UUID of specific problem type (optional)',
+    description: 'UUID or code of specific problem type (optional)',
     example: '8fb2d63d-a233-4123-8478-94420e6f66aa',
   })
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (
+        !trimmed ||
+        trimmed === 'null' ||
+        trimmed === 'undefined' ||
+        trimmed === 'none' ||
+        trimmed === 'other'
+      ) {
+        return undefined;
+      }
+      return trimmed;
+    }
+    return value;
+  })
   @IsOptional()
-  @IsUUID('4', { message: 'problemId must be a valid UUID' })
+  @IsString({ message: 'problemId must be a string' })
   problemId?: string;
 
   @ApiProperty({
@@ -105,6 +125,7 @@ export class CreateBookingDto {
   address: BookingAddressDto;
 
   @ApiPropertyOptional({ example: 28.6139, description: 'Latitude of customer visit location' })
+  @Transform(({ value }) => (value === '' || value === null || isNaN(Number(value)) ? undefined : Number(value)))
   @IsOptional()
   @IsNumber()
   @Min(-90)
@@ -112,6 +133,7 @@ export class CreateBookingDto {
   latitude?: number;
 
   @ApiPropertyOptional({ example: 77.209, description: 'Longitude of customer visit location' })
+  @Transform(({ value }) => (value === '' || value === null || isNaN(Number(value)) ? undefined : Number(value)))
   @IsOptional()
   @IsNumber()
   @Min(-180)
@@ -130,6 +152,7 @@ export class CreateBookingDto {
     example: '10:00 AM - 12:00 PM',
     description: 'Preferred time window for professional arrival',
   })
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
   @IsOptional()
   @IsString()
   timeSlot?: string;

@@ -61,12 +61,35 @@ let BookingsService = BookingsService_1 = class BookingsService {
         if (!category) {
             throw new common_1.NotFoundException(`Category with ID ${dto.categoryId} not found`);
         }
-        if (dto.problemId) {
+        let resolvedProblemId = null;
+        const isUuid = Boolean(dto.problemId) &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.problemId);
+        if (isUuid) {
             const problem = await this.prisma.problemType.findUnique({
                 where: { id: dto.problemId },
             });
-            if (!problem) {
-                throw new common_1.NotFoundException(`Problem with ID ${dto.problemId} not found`);
+            if (problem) {
+                resolvedProblemId = problem.id;
+            }
+            else {
+                this.logger.warn(`[Bookings] Problem with UUID ${dto.problemId} not found in database.`);
+            }
+        }
+        if (!resolvedProblemId && dto.categoryId) {
+            const generalProblem = await this.prisma.problemType.findFirst({
+                where: {
+                    categoryId: dto.categoryId,
+                    isActive: true,
+                    OR: [
+                        { title: { contains: 'Inspection', mode: 'insensitive' } },
+                        { title: { contains: 'Diagnosis', mode: 'insensitive' } },
+                        { title: { contains: 'General', mode: 'insensitive' } },
+                    ],
+                },
+            });
+            if (generalProblem) {
+                resolvedProblemId = generalProblem.id;
+                this.logger.log(`[Bookings] Mapped problem key "${dto.problemId || 'general'}" to "${generalProblem.title}" (${generalProblem.id})`);
             }
         }
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -84,7 +107,7 @@ let BookingsService = BookingsService_1 = class BookingsService {
                     customerId,
                     professionalId: dto.professionalId,
                     categoryId: dto.categoryId,
-                    problemId: dto.problemId || null,
+                    problemId: resolvedProblemId,
                     problemDescription: dto.problemDescription,
                     address: dto.address,
                     latitude: dto.latitude ?? null,
